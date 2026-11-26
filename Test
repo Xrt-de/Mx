@@ -1,0 +1,469 @@
+
+-- MX HUB v1.0
+-- Roblox Studio LocalScript
+-- Unified GUI + Player/NPC Outline ESP
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local ESPEnabled = false
+
+local PLAYER_COLOR = Color3.fromRGB(80, 150, 255)
+local DUMMY_COLOR = Color3.fromRGB(255, 170, 60)
+
+local highlights = {}
+
+--==================================================
+-- CLEAN UP OLD GUI
+--==================================================
+
+local oldGui = PlayerGui:FindFirstChild("MXHub")
+
+if oldGui then
+    oldGui:Destroy()
+end
+
+--==================================================
+-- GUI
+--==================================================
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "MXHub"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = PlayerGui
+
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.new(0, 440, 0, 320)
+main.Position = UDim2.new(0.5, -220, 0.5, -160)
+main.BackgroundColor3 = Color3.fromRGB(19, 19, 27)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local function addCorner(object, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius)
+    corner.Parent = object
+end
+
+addCorner(main, 12)
+
+--==================================================
+-- HEADER
+--==================================================
+
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 48)
+header.BackgroundColor3 = Color3.fromRGB(29, 29, 41)
+header.BorderSizePixel = 0
+header.Parent = main
+
+addCorner(header, 12)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -60, 1, 0)
+title.Position = UDim2.new(0, 16, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "MX HUB"
+title.TextColor3 = Color3.fromRGB(110, 150, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 21
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = header
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 34, 0, 30)
+closeButton.Position = UDim2.new(1, -42, 0, 9)
+closeButton.BackgroundColor3 = Color3.fromRGB(55, 55, 70)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 14
+closeButton.Parent = header
+
+addCorner(closeButton, 7)
+
+--==================================================
+-- SIDEBAR
+--==================================================
+
+local sidebar = Instance.new("Frame")
+sidebar.Position = UDim2.new(0, 10, 0, 60)
+sidebar.Size = UDim2.new(0, 115, 1, -70)
+sidebar.BackgroundTransparency = 1
+sidebar.Parent = main
+
+--==================================================
+-- CONTENT
+--==================================================
+
+local content = Instance.new("Frame")
+content.Position = UDim2.new(0, 135, 0, 60)
+content.Size = UDim2.new(1, -145, 1, -70)
+content.BackgroundTransparency = 1
+content.Parent = main
+
+--==================================================
+-- GUI HELPERS
+--==================================================
+
+local function makeButton(parent, text, position, size)
+    local button = Instance.new("TextButton")
+
+    button.Position = position
+    button.Size = size
+    button.BackgroundColor3 = Color3.fromRGB(38, 38, 52)
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(230, 230, 240)
+    button.Font = Enum.Font.GothamMedium
+    button.TextSize = 14
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = true
+    button.Parent = parent
+
+    addCorner(button, 7)
+
+    return button
+end
+
+local function clearContent()
+    for _, item in ipairs(content:GetChildren()) do
+        item:Destroy()
+    end
+end
+
+local function makeHeading(text)
+    local label = Instance.new("TextLabel")
+
+    label.Size = UDim2.new(1, 0, 0, 32)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 18
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = content
+
+    return label
+end
+
+--==================================================
+-- ESP SYSTEM
+--==================================================
+
+local function isPlayerCharacter(model)
+    return Players:GetPlayerFromCharacter(model) ~= nil
+end
+
+local function isDummy(model)
+    if not model:IsA("Model") then
+        return false
+    end
+
+    if isPlayerCharacter(model) then
+        return false
+    end
+
+    local humanoid = model:FindFirstChildOfClass("Humanoid")
+    local root = model:FindFirstChild("HumanoidRootPart")
+
+    return humanoid ~= nil and root ~= nil
+end
+
+local function createHighlight(model, color)
+    if not model or not model.Parent then
+        return
+    end
+
+    local existing = highlights[model]
+
+    if existing and existing.Parent then
+        existing.Enabled = ESPEnabled
+        existing.OutlineColor = color
+        return
+    end
+
+    local highlight = Instance.new("Highlight")
+
+    highlight.Name = "MXHub_Outline"
+    highlight.Adornee = model
+    highlight.FillTransparency = 1
+    highlight.OutlineTransparency = 0
+    highlight.OutlineColor = color
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Enabled = ESPEnabled
+
+    -- Parent to the model so it is cleaned up with it.
+    highlight.Parent = model
+
+    highlights[model] = highlight
+end
+
+local function removeHighlight(model)
+    local highlight = highlights[model]
+
+    if highlight then
+        highlight:Destroy()
+        highlights[model] = nil
+    end
+end
+
+local function updatePlayer(player)
+    if player == LocalPlayer then
+        return
+    end
+
+    local character = player.Character
+
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        createHighlight(character, PLAYER_COLOR)
+    end
+end
+
+local function scanDummies()
+    for _, object in ipairs(Workspace:GetDescendants()) do
+        if isDummy(object) then
+            createHighlight(object, DUMMY_COLOR)
+        end
+    end
+end
+
+local function scanPlayers()
+    for _, player in ipairs(Players:GetPlayers()) do
+        updatePlayer(player)
+    end
+end
+
+local function setESP(state)
+    ESPEnabled = state
+
+    -- Enable/disable every existing outline.
+    for model, highlight in pairs(highlights) do
+        if model and model.Parent and highlight and highlight.Parent then
+            highlight.Enabled = state
+        else
+            highlights[model] = nil
+        end
+    end
+
+    -- When turned ON, refresh targets.
+    if state then
+        scanPlayers()
+        scanDummies()
+    end
+end
+
+--==================================================
+-- ESP TOGGLE BUTTON
+--==================================================
+
+local espButton
+
+local function updateESPButton()
+    if not espButton then
+        return
+    end
+
+    if ESPEnabled then
+        espButton.Text = "ESP  [ON]"
+        espButton.BackgroundColor3 = Color3.fromRGB(55, 90, 160)
+    else
+        espButton.Text = "ESP  [OFF]"
+        espButton.BackgroundColor3 = Color3.fromRGB(38, 38, 52)
+    end
+end
+
+local function showESPPage()
+    clearContent()
+
+    makeHeading("ESP SETTINGS")
+
+    espButton = makeButton(
+        content,
+        "ESP  [OFF]",
+        UDim2.new(0, 0, 0, 40),
+        UDim2.new(1, 0, 0, 38)
+    )
+
+    espButton.MouseButton1Click:Connect(function()
+        setESP(not ESPEnabled)
+        updateESPButton()
+    end)
+
+    updateESPButton()
+
+    local info = Instance.new("TextLabel")
+    info.Position = UDim2.new(0, 0, 0, 88)
+    info.Size = UDim2.new(1, 0, 0, 60)
+    info.BackgroundTransparency = 1
+    info.Text = "Blue: Players\nOrange: NPC Dummies"
+    info.TextColor3 = Color3.fromRGB(175, 175, 190)
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 13
+    info.TextXAlignment = Enum.TextXAlignment.Left
+    info.Parent = content
+end
+
+--==================================================
+-- AIM PAGE
+--==================================================
+
+local function showAimPage()
+    clearContent()
+
+    makeHeading("AIM ASSIST")
+
+    local info = Instance.new("TextLabel")
+    info.Position = UDim2.new(0, 0, 0, 40)
+    info.Size = UDim2.new(1, 0, 0, 60)
+    info.BackgroundTransparency = 1
+    info.Text = "Training features can be added here."
+    info.TextColor3 = Color3.fromRGB(175, 175, 190)
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 13
+    info.TextXAlignment = Enum.TextXAlignment.Left
+    info.TextWrapped = true
+    info.Parent = content
+end
+
+--==================================================
+-- TABS
+--==================================================
+
+local espTab = makeButton(
+    sidebar,
+    "ESP",
+    UDim2.new(0, 0, 0, 0),
+    UDim2.new(1, 0, 0, 40)
+)
+
+local aimTab = makeButton(
+    sidebar,
+    "AIM",
+    UDim2.new(0, 0, 0, 48),
+    UDim2.new(1, 0, 0, 40)
+)
+
+espTab.MouseButton1Click:Connect(showESPPage)
+aimTab.MouseButton1Click:Connect(showAimPage)
+
+--==================================================
+-- DRAGGING
+--==================================================
+
+local dragging = false
+local dragStart
+local startPosition
+
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPosition = main.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+
+        local delta = input.Position - dragStart
+
+        main.Position = UDim2.new(
+            startPosition.X.Scale,
+            startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale,
+            startPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = false
+    end
+end)
+
+--==================================================
+-- CLOSE BUTTON
+--==================================================
+
+closeButton.MouseButton1Click:Connect(function()
+    gui:Destroy()
+
+    for model, highlight in pairs(highlights) do
+        if highlight then
+            highlight:Destroy()
+        end
+
+        highlights[model] = nil
+    end
+end)
+
+--==================================================
+-- PLAYER EVENTS
+--==================================================
+
+local function connectPlayer(player)
+    player.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart", 10)
+
+        if ESPEnabled then
+            createHighlight(character, PLAYER_COLOR)
+        end
+    end)
+
+    if player.Character and ESPEnabled then
+        updatePlayer(player)
+    end
+end
+
+Players.PlayerAdded:Connect(connectPlayer)
+
+Players.PlayerRemoving:Connect(function(player)
+    if player.Character then
+        removeHighlight(player.Character)
+    end
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    connectPlayer(player)
+end
+
+--==================================================
+-- INITIAL SCAN
+--==================================================
+
+showESPPage()
+
+--==================================================
+-- REFRESH LOOP
+--==================================================
+
+task.spawn(function()
+    while gui.Parent do
+        task.wait(2)
+
+        if ESPEnabled then
+            scanPlayers()
+            scanDummies()
+        end
+    end
+end)
+
+print("MX Hub v1.0 loaded successfully")
