@@ -1,11 +1,12 @@
 -- MX HUB v1.1
--- Roblox Studio LocalScript
+-- Roblox LocalScript
 -- Unified GUI + Player/NPC Outline ESP + Player Tracers
--- Place in StarterPlayer > StarterPlayerScripts in your own Studio experience.
+-- Place in StarterPlayer > StarterPlayerScripts.
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -430,7 +431,7 @@ local function showESPPage()
     info.Position = UDim2.new(0, 0, 0, 170)
     info.Size = UDim2.new(1, 0, 0, 58)
     info.BackgroundTransparency = 1
-    info.Text = "Click color buttons to cycle colors.\\nOrange: NPC Dummies"
+    info.Text = "Click color buttons to cycle colors.\nOrange: NPC Dummies"
     info.TextColor3 = Color3.fromRGB(175, 175, 190)
     info.Font = Enum.Font.Gotham
     info.TextSize = 13
@@ -440,7 +441,6 @@ local function showESPPage()
 end
 
 -- AIM ASSIST
--- Studio test-place camera training feature with a selectable body-part target.
 local aimButton
 local targetPartButton
 local TARGET_PARTS = {"Head", "Torso", "Legs"}
@@ -462,7 +462,6 @@ local function getSelectedTargetPosition(character)
             or character:FindFirstChild("HumanoidRootPart")
         return torso and torso.Position or nil
     else
-        -- R15: midpoint of lower legs; R6: midpoint of the two legs.
         local leftLeg = character:FindFirstChild("LeftLowerLeg")
             or character:FindFirstChild("Left Leg")
         local rightLeg = character:FindFirstChild("RightLowerLeg")
@@ -660,4 +659,19 @@ local function showAimPage()
     info.Size = UDim2.new(1, 0, 0, 52)
     info.BackgroundTransparency = 1
     info.Text = "1 = slow smooth tracking\n100 = very fast snap/flick\nAim point follows selected Head / Torso / Legs."
-    info.TextColor3 = Color3.fromRGB(175, 1
+    info.TextColor3 = Color3.fromRGB(175, 175, 190)
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 13
+    info.TextXAlignment = Enum.TextXAlignment.Left
+    info.TextWrapped = true
+    info.Parent = content
+end
+
+-- TABS
+local espTab = makeButton(
+    sidebar, "ESP",
+    UDim2.new(0, 0, 0, 0),
+    UDim2.new(1, 0, 0, 40)
+)
+
+local 
