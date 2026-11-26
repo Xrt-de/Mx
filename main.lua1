@@ -1,20 +1,63 @@
--- AXIOM NETWORK PANEL
--- LocalScript | StarterPlayerScripts
+
+-- AXIOM NETWORK + SERVER HITBOX
+-- Single installer Script
+-- Place in ServerScriptService
+-- Installs server broadcaster + client UI automatically
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--------------------------------------------------
+-- REMOTE SETUP
+--------------------------------------------------
+
+local REMOTE_NAME = "AxiomPositionUpdate"
+
+local remote = ReplicatedStorage:FindFirstChild(REMOTE_NAME)
+
+if not remote then
+    remote = Instance.new("RemoteEvent")
+    remote.Name = REMOTE_NAME
+    remote.Parent = ReplicatedStorage
+end
+
+--------------------------------------------------
+-- SERVER CONFIGURATION
+--------------------------------------------------
+
+local UPDATE_RATE = 0.1
+
+--------------------------------------------------
+-- CLIENT SCRIPT SOURCE
+--------------------------------------------------
+
+local CLIENT_SOURCE = [==[
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Stats = game:GetService("Stats")
 
 local player = Players.LocalPlayer
+local remote = ReplicatedStorage:WaitForChild("AxiomPositionUpdate")
+
+local enabled = false
+local serverCFrame
+local serverSize
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "AxiomNetworkPanel"
+gui.Name = "AxiomNetworkHitbox"
 gui.ResetOnSpawn = false
+gui.DisplayOrder = 50
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(230, 115)
-frame.Position = UDim2.new(0, 25, 0.5, -60)
-frame.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
+frame.Name = "Main"
+frame.Size = UDim2.fromOffset(265, 190)
+frame.Position = UDim2.new(0, 25, 0.5, -95)
+frame.BackgroundColor3 = Color3.fromRGB(16, 19, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
@@ -22,42 +65,158 @@ Instance.new("UICorner", frame).CornerRadius =
     UDim.new(0, 12)
 
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(65, 105, 255)
+stroke.Color = Color3.fromRGB(55, 125, 255)
 stroke.Thickness = 1.5
 stroke.Parent = frame
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 0, 32)
-title.Position = UDim2.fromOffset(10, 8)
-title.BackgroundTransparency = 1
-title.Text = "AXIOM  /  NETWORK"
-title.TextColor3 = Color3.fromRGB(120, 155, 255)
+local function makeLabel(name, text, y, color, size)
+    local label = Instance.new("TextLabel")
+
+    label.Name = name
+    label.Size = UDim2.new(1, -20, 0, 25)
+    label.Position = UDim2.fromOffset(10, y)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = color
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = size or 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    return label
+end
+
+local title = makeLabel(
+    "Title",
+    "AXIOM  /  NETWORK",
+    8,
+    Color3.fromRGB(100, 160, 255),
+    14
+)
+
 title.Font = Enum.Font.GothamBold
-title.TextSize = 13
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = frame
 
-local pingLabel = Instance.new("TextLabel")
-pingLabel.Size = UDim2.new(1, -20, 0, 28)
-pingLabel.Position = UDim2.fromOffset(10, 43)
-pingLabel.BackgroundTransparency = 1
-pingLabel.Text = "PING: -- ms"
-pingLabel.TextColor3 = Color3.new(1, 1, 1)
-pingLabel.Font = Enum.Font.GothamMedium
-pingLabel.TextSize = 16
-pingLabel.TextXAlignment = Enum.TextXAlignment.Left
-pingLabel.Parent = frame
+local pingLabel = makeLabel(
+    "Ping",
+    "PING: -- ms",
+    40,
+    Color3.new(1, 1, 1),
+    14
+)
 
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 22)
-statusLabel.Position = UDim2.fromOffset(10, 76)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "STATUS: CONNECTED"
-statusLabel.TextColor3 = Color3.fromRGB(90, 220, 140)
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextSize = 12
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = frame
+local networkStatus = makeLabel(
+    "NetworkStatus",
+    "NETWORK: CONNECTING",
+    68,
+    Color3.fromRGB(90, 220, 140)
+)
+
+local positionLabel = makeLabel(
+    "Position",
+    "SERVER XYZ: WAITING",
+    96,
+    Color3.fromRGB(180, 200, 230),
+    11
+)
+
+local hitboxStatus = makeLabel(
+    "HitboxStatus",
+    "SERVER HITBOX: OFF",
+    120,
+    Color3.fromRGB(180, 200, 230),
+    11
+)
+
+--------------------------------------------------
+-- TOGGLE BUTTON
+--------------------------------------------------
+
+local toggle = Instance.new("TextButton")
+
+toggle.Name = "HitboxToggle"
+toggle.Size = UDim2.new(1, -20, 0, 35)
+toggle.Position = UDim2.fromOffset(10, 150)
+toggle.BackgroundColor3 = Color3.fromRGB(35, 85, 190)
+toggle.Text = "HITBOX: OFF"
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 13
+toggle.Parent = frame
+
+Instance.new("UICorner", toggle).CornerRadius =
+    UDim.new(0, 8)
+
+--------------------------------------------------
+-- SERVER POSITION VISUALIZER
+--------------------------------------------------
+
+local hitbox = Instance.new("Part")
+
+hitbox.Name = "AxiomServerPositionBox"
+hitbox.Anchored = true
+hitbox.CanCollide = false
+hitbox.CanTouch = false
+hitbox.CanQuery = false
+hitbox.CastShadow = false
+hitbox.Material = Enum.Material.ForceField
+hitbox.Color = Color3.fromRGB(0, 110, 255)
+hitbox.Transparency = 1
+hitbox.Size = Vector3.new(4, 6, 2)
+hitbox.Parent = workspace
+
+local selection = Instance.new("SelectionBox")
+
+selection.Name = "BlueServerOutline"
+selection.Adornee = hitbox
+selection.Color3 = Color3.fromRGB(40, 150, 255)
+selection.LineThickness = 0.06
+selection.SurfaceTransparency = 1
+selection.Visible = false
+selection.Parent = hitbox
+
+--------------------------------------------------
+-- RECEIVE SERVER DATA
+--------------------------------------------------
+
+remote.OnClientEvent:Connect(function(cframe, size)
+    if typeof(cframe) ~= "CFrame" then
+        return
+    end
+
+    if typeof(size) ~= "Vector3" then
+        return
+    end
+
+    serverCFrame = cframe
+    serverSize = size
+end)
+
+--------------------------------------------------
+-- HITBOX TOGGLE
+--------------------------------------------------
+
+toggle.Activated:Connect(function()
+    enabled = not enabled
+
+    toggle.Text = enabled
+        and "HITBOX: ON"
+        or "HITBOX: OFF"
+
+    toggle.BackgroundColor3 = enabled
+        and Color3.fromRGB(20, 135, 85)
+        or Color3.fromRGB(35, 85, 190)
+
+    selection.Visible = enabled
+    hitbox.Transparency = enabled and 0.65 or 1
+
+    hitboxStatus.Text = enabled
+        and "SERVER HITBOX: ON"
+        or "SERVER HITBOX: OFF"
+end)
+
+--------------------------------------------------
+-- PING MONITOR
+--------------------------------------------------
 
 task.spawn(function()
     while gui.Parent do
@@ -67,29 +226,118 @@ task.spawn(function()
             ]:GetValue()
         end)
 
-        if success and ping then
+        if success and typeof(ping) == "number" then
             pingLabel.Text = string.format(
                 "PING: %d ms",
                 math.floor(ping)
             )
 
             if ping < 100 then
-                statusLabel.Text = "STATUS: STABLE"
-                statusLabel.TextColor3 =
+                networkStatus.Text = "NETWORK: STABLE"
+                networkStatus.TextColor3 =
                     Color3.fromRGB(90, 220, 140)
+
             elseif ping < 200 then
-                statusLabel.Text = "STATUS: MODERATE"
-                statusLabel.TextColor3 =
+                networkStatus.Text = "NETWORK: MODERATE"
+                networkStatus.TextColor3 =
                     Color3.fromRGB(255, 190, 70)
+
             else
-                statusLabel.Text = "STATUS: HIGH LATENCY"
-                statusLabel.TextColor3 =
+                networkStatus.Text = "NETWORK: HIGH LATENCY"
+                networkStatus.TextColor3 =
                     Color3.fromRGB(255, 90, 90)
             end
+
         else
-            statusLabel.Text = "STATUS: UNAVAILABLE"
+            networkStatus.Text = "NETWORK: UNAVAILABLE"
         end
 
         task.wait(1)
     end
 end)
+
+--------------------------------------------------
+-- SERVER POSITION DISPLAY
+--------------------------------------------------
+
+task.spawn(function()
+    while gui.Parent do
+        if enabled and serverCFrame and serverSize then
+            hitbox.CFrame = serverCFrame
+
+            hitbox.Size = serverSize
+                + Vector3.new(0.15, 0.15, 0.15)
+
+            local position = serverCFrame.Position
+
+            positionLabel.Text = string.format(
+                "SERVER XYZ: %.1f / %.1f / %.1f",
+                position.X,
+                position.Y,
+                position.Z
+            )
+
+        elseif not serverCFrame then
+            positionLabel.Text = "SERVER XYZ: WAITING"
+        end
+
+        task.wait(0.03)
+    end
+end)
+
+print("[Axiom] Network + server hitbox loaded.")
+]==]
+
+--------------------------------------------------
+-- INSTALL CLIENT SCRIPT
+--------------------------------------------------
+
+local function installClient(player)
+    local playerScripts = player:WaitForChild("PlayerScripts")
+
+    if playerScripts:FindFirstChild("AxiomNetworkClient") then
+        return
+    end
+
+    local client = Instance.new("LocalScript")
+    client.Name = "AxiomNetworkClient"
+    client.Source = CLIENT_SOURCE
+    client.Parent = playerScripts
+end
+
+Players.PlayerAdded:Connect(function(player)
+    task.spawn(installClient, player)
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    task.spawn(installClient, player)
+end
+
+--------------------------------------------------
+-- SERVER POSITION BROADCAST
+--------------------------------------------------
+
+task.spawn(function()
+    while true do
+        for _, player in ipairs(Players:GetPlayers()) do
+            local character = player.Character
+            local root = character
+                and character:FindFirstChild("HumanoidRootPart")
+
+            local humanoid = character
+                and character:FindFirstChildOfClass("Humanoid")
+
+            if root and humanoid and humanoid.Health > 0 then
+                remote:FireClient(
+                    player,
+                    root.CFrame,
+                    root.Size
+                )
+            end
+        end
+
+        task.wait(UPDATE_RATE)
+    end
+end)
+
+print("[Axiom] Single-file network system installed.")
