@@ -14,7 +14,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- SETTINGS
 local ESPEnabled = false
 local AimAssistEnabled = false
-local AIM_SPEED = 50 -- 1 = slow, 100 = very fast
+local AIM_SPEED = 50
 local AIM_RADIUS = 180
 local DUMMY_COLOR = Color3.fromRGB(255, 170, 60)
 
@@ -47,13 +47,11 @@ local highlights = {}
 local tracers = {}
 local connections = {}
 
--- CLEAN UP OLD GUI
 local oldGui = PlayerGui:FindFirstChild("MXHub")
 if oldGui then
     oldGui:Destroy()
 end
 
--- GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "MXHub"
 gui.ResetOnSpawn = false
@@ -76,7 +74,6 @@ end
 
 addCorner(main, 12)
 
--- HEADER
 local header = Instance.new("Frame")
 header.Size = UDim2.new(1, 0, 0, 48)
 header.BackgroundColor3 = Color3.fromRGB(29, 29, 41)
@@ -106,21 +103,18 @@ closeButton.TextSize = 14
 closeButton.Parent = header
 addCorner(closeButton, 7)
 
--- SIDEBAR
 local sidebar = Instance.new("Frame")
 sidebar.Position = UDim2.new(0, 10, 0, 60)
 sidebar.Size = UDim2.new(0, 115, 1, -70)
 sidebar.BackgroundTransparency = 1
 sidebar.Parent = main
 
--- CONTENT
 local content = Instance.new("Frame")
 content.Position = UDim2.new(0, 135, 0, 60)
 content.Size = UDim2.new(1, -145, 1, -70)
 content.BackgroundTransparency = 1
 content.Parent = main
 
--- GUI HELPERS
 local function makeButton(parent, text, position, size)
     local button = Instance.new("TextButton")
     button.Position = position
@@ -156,7 +150,6 @@ local function makeHeading(text)
     return label
 end
 
--- ESP HELPERS
 local function isPlayerCharacter(model)
     return Players:GetPlayerFromCharacter(model) ~= nil
 end
@@ -165,7 +158,6 @@ local function isDummy(model)
     if not model:IsA("Model") or isPlayerCharacter(model) then
         return false
     end
-
     return model:FindFirstChildOfClass("Humanoid") ~= nil
         and model:FindFirstChild("HumanoidRootPart") ~= nil
 end
@@ -174,14 +166,12 @@ local function createHighlight(model, color)
     if not model or not model.Parent then
         return
     end
-
     local existing = highlights[model]
     if existing and existing.Parent then
         existing.Enabled = ESPEnabled
         existing.OutlineColor = color
         return
     end
-
     local highlight = Instance.new("Highlight")
     highlight.Name = "MXHub_Outline"
     highlight.Adornee = model
@@ -191,7 +181,6 @@ local function createHighlight(model, color)
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Enabled = ESPEnabled
     highlight.Parent = model
-
     highlights[model] = highlight
 end
 
@@ -207,7 +196,6 @@ local function updatePlayer(player)
     if player == LocalPlayer then
         return
     end
-
     local character = player.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
         createHighlight(character, getPlayerColor())
@@ -228,20 +216,17 @@ local function scanDummies()
     end
 end
 
--- PLAYER TRACERS (players only; controlled by ESP toggle)
 local function removeTracer(player)
     local data = tracers[player]
     if not data then
         return
     end
-
     if data.beam then
         data.beam:Destroy()
     end
     if data.targetAttachment then
         data.targetAttachment:Destroy()
     end
-
     tracers[player] = nil
 end
 
@@ -249,43 +234,35 @@ local function createTracer(player)
     if player == LocalPlayer or not ESPEnabled then
         return
     end
-
     local myCharacter = LocalPlayer.Character
     local targetCharacter = player.Character
     local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
     local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
-
     if not myRoot or not targetRoot then
         removeTracer(player)
         return
     end
-
     local current = tracers[player]
     if current and current.beam and current.beam.Parent then
         local sameRoots = current.beam.Attachment0
             and current.beam.Attachment0.Parent == myRoot
             and current.beam.Attachment1
             and current.beam.Attachment1.Parent == targetRoot
-
         if sameRoots then
             current.beam.Enabled = true
             return
         end
-
         removeTracer(player)
     end
-
     local startAttachment = myRoot:FindFirstChild("MXHubTracerStart")
     if not startAttachment then
         startAttachment = Instance.new("Attachment")
         startAttachment.Name = "MXHubTracerStart"
         startAttachment.Parent = myRoot
     end
-
     local targetAttachment = Instance.new("Attachment")
     targetAttachment.Name = "MXHubTracerEnd"
     targetAttachment.Parent = targetRoot
-
     local beam = Instance.new("Beam")
     beam.Name = "MXHubPlayerTracer"
     beam.Attachment0 = startAttachment
@@ -297,7 +274,6 @@ local function createTracer(player)
     beam.Transparency = NumberSequence.new(0)
     beam.Enabled = true
     beam.Parent = Workspace
-
     tracers[player] = {
         beam = beam,
         targetAttachment = targetAttachment
@@ -313,7 +289,6 @@ local function updateTracers()
         end
         return
     end
-
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             createTracer(player)
@@ -341,7 +316,6 @@ end
 
 local function setESP(state)
     ESPEnabled = state
-
     for model, highlight in pairs(highlights) do
         if model and model.Parent and highlight and highlight.Parent then
             highlight.Enabled = state
@@ -349,9 +323,7 @@ local function setESP(state)
             highlights[model] = nil
         end
     end
-
     updateTracers()
-
     if state then
         scanPlayers()
         scanDummies()
@@ -359,14 +331,12 @@ local function setESP(state)
     end
 end
 
--- ESP PAGE
 local espButton
 
 local function updateESPButton()
     if not espButton then
         return
     end
-
     if ESPEnabled then
         espButton.Text = "ESP  [ON]"
         espButton.BackgroundColor3 = Color3.fromRGB(55, 90, 160)
@@ -379,19 +349,16 @@ end
 local function showESPPage()
     clearContent()
     makeHeading("ESP SETTINGS")
-
     espButton = makeButton(
         content,
         "ESP  [OFF]",
         UDim2.new(0, 0, 0, 40),
         UDim2.new(1, 0, 0, 38)
     )
-
     espButton.MouseButton1Click:Connect(function()
         setESP(not ESPEnabled)
         updateESPButton()
     end)
-
     updateESPButton()
 
     local tracerColorButton = makeButton(
@@ -400,7 +367,6 @@ local function showESPPage()
         UDim2.new(0, 0, 0, 88),
         UDim2.new(1, 0, 0, 34)
     )
-
     tracerColorButton.MouseButton1Click:Connect(function()
         tracerColorIndex = (tracerColorIndex % #COLOR_OPTIONS) + 1
         tracerColorButton.Text = "Tracer Color: " .. COLOR_OPTIONS[tracerColorIndex].name
@@ -415,7 +381,6 @@ local function showESPPage()
         UDim2.new(0, 0, 0, 128),
         UDim2.new(1, 0, 0, 34)
     )
-
     playerColorButton.MouseButton1Click:Connect(function()
         playerColorIndex = (playerColorIndex % #COLOR_OPTIONS) + 1
         playerColorButton.Text = "Player Outline: " .. COLOR_OPTIONS[playerColorIndex].name
@@ -440,7 +405,6 @@ local function showESPPage()
     info.Parent = content
 end
 
--- AIM ASSIST
 local aimButton
 local targetPartButton
 local TARGET_PARTS = {"Head", "Torso", "Legs"}
@@ -450,9 +414,7 @@ local function getSelectedTargetPosition(character)
     if not character then
         return nil
     end
-
     local selected = TARGET_PARTS[targetPartIndex]
-
     if selected == "Head" then
         local head = character:FindFirstChild("Head")
         return head and head.Position or nil
@@ -479,24 +441,19 @@ local function getClosestAimTarget()
     if not camera then
         return nil
     end
-
     local viewportCenter = camera.ViewportSize / 2
     local closestPosition = nil
     local closestDistance = AIM_RADIUS
-
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local character = player.Character
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
             local targetPosition = getSelectedTargetPosition(character)
-
             if humanoid and humanoid.Health > 0 and targetPosition then
                 local screenPoint, onScreen = camera:WorldToViewportPoint(targetPosition)
-
                 if onScreen and screenPoint.Z > 0 then
                     local screenPosition = Vector2.new(screenPoint.X, screenPoint.Y)
                     local distance = (screenPosition - viewportCenter).Magnitude
-
                     if distance < closestDistance then
                         closestDistance = distance
                         closestPosition = targetPosition
@@ -505,7 +462,6 @@ local function getClosestAimTarget()
             end
         end
     end
-
     return closestPosition
 end
 
@@ -519,7 +475,6 @@ local function updateAimButton()
     if not aimButton then
         return
     end
-
     if AimAssistEnabled then
         aimButton.Text = "AIM ASSIST  [ON]"
         aimButton.BackgroundColor3 = Color3.fromRGB(55, 90, 160)
@@ -532,19 +487,16 @@ end
 local function showAimPage()
     clearContent()
     makeHeading("AIM ASSIST")
-
     aimButton = makeButton(
         content,
         "AIM ASSIST  [OFF]",
         UDim2.new(0, 0, 0, 40),
         UDim2.new(1, 0, 0, 38)
     )
-
     aimButton.MouseButton1Click:Connect(function()
         AimAssistEnabled = not AimAssistEnabled
         updateAimButton()
     end)
-
     updateAimButton()
 
     targetPartButton = makeButton(
@@ -615,16 +567,13 @@ local function showAimPage()
         if width <= 0 then
             return
         end
-
         local relative = math.clamp(
             (x - sliderTrack.AbsolutePosition.X) / width,
             0,
             1
         )
-
         AIM_SPEED = math.clamp(math.floor(1 + relative * 99 + 0.5), 1, 100)
         local alpha = (AIM_SPEED - 1) / 99
-
         sliderFill.Size = UDim2.new(alpha, 0, 1, 0)
         sliderKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
         speedValueLabel.Text = tostring(AIM_SPEED)
@@ -667,11 +616,277 @@ local function showAimPage()
     info.Parent = content
 end
 
--- TABS
 local espTab = makeButton(
     sidebar, "ESP",
     UDim2.new(0, 0, 0, 0),
     UDim2.new(1, 0, 0, 40)
 )
 
-local 
+local aimTab = makeButton(
+    sidebar, "AIM",
+    UDim2.new(0, 0, 0, 48),
+    UDim2.new(1, 0, 0, 40)
+)
+
+espTab.MouseButton1Click:Connect(showESPPage)
+aimTab.MouseButton1Click:Connect(showAimPage)
+
+local dragging = false
+local dragStart
+local startPosition
+
+-- ============================================================
+-- MOVEMENT CONTROLS (MX Hub v1.8 module, integrated in this file)
+-- ============================================================
+
+do
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local UserInputService = UIS
+
+    local character, humanoid, root
+    local flying, noclip = false, false
+    local ascend, descend = false, false
+    local flySpeed, walkSpeed = 40, 16
+    local flyVelocity, flyConnection, noclipConnection
+    local originalWalkSpeed = 16
+    local savedCollision = {}
+
+    local oldMovementGui = playerGui:FindFirstChild("MXMovementDev")
+    if oldMovementGui then
+        oldMovementGui:Destroy()
+    end
+
+    local mgui = Instance.new("ScreenGui")
+    mgui.Name = "MXMovementDev"
+    mgui.ResetOnSpawn = false
+    mgui.Parent = playerGui
+
+    local panel = Instance.new("Frame")
+    panel.Name = "MovementPanel"
+    panel.Size = UDim2.fromOffset(156, 178)
+    panel.Position = UDim2.new(1, -166, 0.5, -89)
+    panel.BackgroundColor3 = Color3.fromRGB(25, 28, 38)
+    panel.BackgroundTransparency = 0.1
+    panel.BorderSizePixel = 0
+    panel.Parent = mgui
+    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 9)
+
+    local panelTitle = Instance.new("TextLabel")
+    panelTitle.Size = UDim2.new(1, -8, 0, 22)
+    panelTitle.Position = UDim2.fromOffset(4, 2)
+    panelTitle.BackgroundTransparency = 1
+    panelTitle.Text = "MX MOVE"
+    panelTitle.TextColor3 = Color3.fromRGB(235, 240, 255)
+    panelTitle.Font = Enum.Font.GothamBold
+    panelTitle.TextSize = 13
+    panelTitle.Parent = panel
+
+    local function button(name, text, pos, size)
+        local b = Instance.new("TextButton")
+        b.Name = name
+        b.Text = text
+        b.Position = pos
+        b.Size = size
+        b.BackgroundColor3 = Color3.fromRGB(55, 95, 170)
+        b.TextColor3 = Color3.new(1, 1, 1)
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 12
+        b.BorderSizePixel = 0
+        b.Parent = panel
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+        return b
+    end
+
+    local flyToggle = button("FlyToggle", "FLY: OFF", UDim2.fromOffset(6, 26), UDim2.new(1, -12, 0, 25))
+    local noclipToggle = button("NoclipToggle", "NOCLIP: OFF", UDim2.fromOffset(6, 55), UDim2.new(1, -12, 0, 25))
+    local upButton = button("Up", "▲", UDim2.fromOffset(6, 84), UDim2.new(0.5, -9, 0, 25))
+    local downButton = button("Down", "▼", UDim2.new(0.5, 3, 0, 84), UDim2.new(0.5, -9, 0, 25))
+
+    local function makeSlider(label, y, initial, callback)
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Size = UDim2.new(1, -12, 0, 15)
+        valueLabel.Position = UDim2.fromOffset(6, y)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.TextColor3 = Color3.fromRGB(230, 235, 245)
+        valueLabel.Font = Enum.Font.Gotham
+        valueLabel.TextSize = 10
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+        valueLabel.Text = label .. ": " .. initial
+        valueLabel.Parent = panel
+
+        local bar = Instance.new("Frame")
+        bar.Size = UDim2.new(1, -12, 0, 8)
+        bar.Position = UDim2.fromOffset(6, y + 15)
+        bar.BackgroundColor3 = Color3.fromRGB(65, 70, 85)
+        bar.BorderSizePixel = 0
+        bar.Parent = panel
+        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new(initial / 100, 0, 1, 0)
+        fill.BackgroundColor3 = Color3.fromRGB(80, 145, 235)
+        fill.BorderSizePixel = 0
+        fill.Parent = bar
+        Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+        local hit = Instance.new("TextButton")
+        hit.Size = UDim2.new(1, 0, 1, 12)
+        hit.Position = UDim2.fromOffset(0, -6)
+        hit.BackgroundTransparency = 1
+        hit.Text = ""
+        hit.Parent = bar
+
+        local dragging = false
+        local function setFromX(x)
+            local value = math.clamp(math.floor(((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X) * 100 + 0.5), 1, 100)
+            fill.Size = UDim2.new(value / 100, 0, 1, 0)
+            valueLabel.Text = label .. ": " .. value
+            callback(value)
+        end
+        hit.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                setFromX(input.Position.X)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                setFromX(input.Position.X)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+    end
+
+    makeSlider("FLY SPEED", 113, flySpeed, function(v) flySpeed = v end)
+    makeSlider("WALK SPEED", 145, walkSpeed, function(v)
+        walkSpeed = v
+        if humanoid then humanoid.WalkSpeed = v end
+    end)
+
+    local function refreshCharacter()
+        character = player.Character or player.CharacterAdded:Wait()
+        humanoid = character:WaitForChild("Humanoid")
+        root = character:WaitForChild("HumanoidRootPart")
+        originalWalkSpeed = humanoid.WalkSpeed
+        humanoid.WalkSpeed = walkSpeed
+    end
+    refreshCharacter()
+
+    local function stopFly()
+        flying = false
+        ascend, descend = false, false
+        if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+        if flyVelocity then flyVelocity:Destroy(); flyVelocity = nil end
+        flyToggle.Text = "FLY: OFF"
+        flyToggle.BackgroundColor3 = Color3.fromRGB(55, 95, 170)
+        if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Freefall) end
+    end
+
+    local function startFly()
+        if not root or not root.Parent then refreshCharacter() end
+        flying = true
+        flyVelocity = Instance.new("BodyVelocity")
+        flyVelocity.Name = "MXVerticalFlight"
+        flyVelocity.MaxForce = Vector3.new(0, math.huge, 0)
+        flyVelocity.P = 20000
+        flyVelocity.Velocity = Vector3.zero
+        flyVelocity.Parent = root
+        flyToggle.Text = "FLY: ON"
+        flyToggle.BackgroundColor3 = Color3.fromRGB(35, 150, 95)
+        flyConnection = RunService.Heartbeat:Connect(function()
+            if not flying or not root or not root.Parent or not flyVelocity then stopFly(); return end
+            local speed = flySpeed
+            local y = 0
+            if ascend and not descend then y = speed
+            elseif descend and not ascend then y = -speed end
+            flyVelocity.Velocity = Vector3.new(0, y, 0)
+        end)
+    end
+
+    local function restoreCollisions()
+        for part, value in pairs(savedCollision) do
+            if part and part.Parent then part.CanCollide = value end
+        end
+        table.clear(savedCollision)
+    end
+
+    local function stopNoclip()
+        noclip = false
+        if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
+        restoreCollisions()
+        noclipToggle.Text = "NOCLIP: OFF"
+        noclipToggle.BackgroundColor3 = Color3.fromRGB(55, 95, 170)
+    end
+
+    local function startNoclip()
+        if not character or not character.Parent then refreshCharacter() end
+        noclip = true
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedCollision[part] = part.CanCollide
+                part.CanCollide = false
+            end
+        end
+        noclipToggle.Text = "NOCLIP: ON"
+        noclipToggle.BackgroundColor3 = Color3.fromRGB(35, 150, 95)
+
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        rayParams.FilterDescendantsInstances = {character}
+        rayParams.IgnoreWater = false
+
+        noclipConnection = RunService.Heartbeat:Connect(function()
+            if not noclip or not character or not character.Parent or not root then stopNoclip(); return end
+            local result = workspace:Raycast(root.Position, Vector3.new(0, -18, 0), rayParams)
+            if result then
+                local halfHeight = math.max(2, root.Size.Y * 0.5 + 1.5)
+                local safeY = result.Position.Y + halfHeight
+                if root.Position.Y < safeY then
+                    root.CFrame = CFrame.new(root.Position.X, safeY, root.Position.Z) * root.CFrame.Rotation
+                    local vel = root.AssemblyLinearVelocity
+                    if vel.Y < 0 then root.AssemblyLinearVelocity = Vector3.new(vel.X, 0, vel.Z) end
+                end
+            end
+        end)
+    end
+
+    flyToggle.Activated:Connect(function()
+        if flying then stopFly() else startFly() end
+    end)
+    noclipToggle.Activated:Connect(function()
+        if noclip then stopNoclip() else startNoclip() end
+    end)
+
+    local function holdButton(btn, set)
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then set(true) end
+        end)
+        btn.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then set(false) end
+        end)
+    end
+    holdButton(upButton, function(v) ascend = v end)
+    holdButton(downButton, function(v) descend = v end)
+
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.KeyCode == Enum.KeyCode.E then ascend = true end
+        if input.KeyCode == Enum.KeyCode.Q then descend = true end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.E then ascend = false end
+        if input.KeyCode == Enum.KeyCode.Q then descend = false end
+    end)
+
+    player.CharacterAdded:Connect(function()
+        stopFly()
+        stopNoclip()
+        task.wait(0.2)
+        refreshCharacter()
+    end)
+end
