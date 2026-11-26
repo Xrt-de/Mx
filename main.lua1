@@ -12,6 +12,9 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- SETTINGS
 local ESPEnabled = false
+local AimAssistEnabled = false
+local AIM_SMOOTHNESS = 0.12
+local AIM_RADIUS = 180
 local PLAYER_COLOR = Color3.fromRGB(80, 150, 255)
 local DUMMY_COLOR = Color3.fromRGB(255, 170, 60)
 local TRACER_COLOR = Color3.fromRGB(80, 150, 255)
@@ -362,16 +365,83 @@ local function showESPPage()
     info.Parent = content
 end
 
--- AIM PAGE (placeholder)
+-- AIM ASSIST
+-- Studio test-place feature: aims toward the closest player's HumanoidRootPart.
+-- No selectable body-part targeting; the target point is fixed at the character root.
+local aimButton
+
+local function getClosestAimTarget()
+    local camera = Workspace.CurrentCamera
+    if not camera then
+        return nil
+    end
+
+    local viewportCenter = camera.ViewportSize / 2
+    local closestRoot = nil
+    local closestDistance = AIM_RADIUS
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+
+            if humanoid and humanoid.Health > 0 and root then
+                local screenPoint, onScreen = camera:WorldToViewportPoint(root.Position)
+
+                if onScreen and screenPoint.Z > 0 then
+                    local screenPosition = Vector2.new(screenPoint.X, screenPoint.Y)
+                    local distance = (screenPosition - viewportCenter).Magnitude
+
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        closestRoot = root
+                    end
+                end
+            end
+        end
+    end
+
+    return closestRoot
+end
+
+local function updateAimButton()
+    if not aimButton then
+        return
+    end
+
+    if AimAssistEnabled then
+        aimButton.Text = "AIM ASSIST  [ON]"
+        aimButton.BackgroundColor3 = Color3.fromRGB(55, 90, 160)
+    else
+        aimButton.Text = "AIM ASSIST  [OFF]"
+        aimButton.BackgroundColor3 = Color3.fromRGB(38, 38, 52)
+    end
+end
+
 local function showAimPage()
     clearContent()
     makeHeading("AIM ASSIST")
 
+    aimButton = makeButton(
+        content,
+        "AIM ASSIST  [OFF]",
+        UDim2.new(0, 0, 0, 40),
+        UDim2.new(1, 0, 0, 38)
+    )
+
+    aimButton.MouseButton1Click:Connect(function()
+        AimAssistEnabled = not AimAssistEnabled
+        updateAimButton()
+    end)
+
+    updateAimButton()
+
     local info = Instance.new("TextLabel")
-    info.Position = UDim2.new(0, 0, 0, 40)
-    info.Size = UDim2.new(1, 0, 0, 60)
+    info.Position = UDim2.new(0, 0, 0, 88)
+    info.Size = UDim2.new(1, 0, 0, 78)
     info.BackgroundTransparency = 1
-    info.Text = "Training features can be added here."
+    info.Text = "Toggle aim assist ON/OFF.\nAutomatically targets the character root; no head, torso, or leg selection."
     info.TextColor3 = Color3.fromRGB(175, 175, 190)
     info.Font = Enum.Font.Gotham
     info.TextSize = 13
@@ -453,9 +523,31 @@ local function cleanup()
     table.clear(connections)
 end
 
+-- MINIMIZE / RESTORE
+-- X hides the main hub and shows a small MX button to reopen it.
+local restoreButton = Instance.new("TextButton")
+restoreButton.Name = "MXHubRestore"
+restoreButton.Size = UDim2.new(0, 54, 0, 38)
+restoreButton.Position = UDim2.new(0, 16, 0.5, -19)
+restoreButton.BackgroundColor3 = Color3.fromRGB(29, 29, 41)
+restoreButton.Text = "MX"
+restoreButton.TextColor3 = Color3.fromRGB(110, 150, 255)
+restoreButton.Font = Enum.Font.GothamBold
+restoreButton.TextSize = 16
+restoreButton.BorderSizePixel = 0
+restoreButton.Visible = false
+restoreButton.Parent = gui
+addCorner(restoreButton, 9)
+
+closeButton.Text = "X"
 closeButton.MouseButton1Click:Connect(function()
-    cleanup()
-    gui:Destroy()
+    main.Visible = false
+    restoreButton.Visible = true
+end)
+
+restoreButton.MouseButton1Click:Connect(function()
+    restoreButton.Visible = false
+    main.Visible = true
 end)
 
 -- PLAYER EVENTS
@@ -502,4 +594,18 @@ task.spawn(function()
     end
 end)
 
-print("MX Hub v1.1 loaded successfully")
+table.insert(connections, game:GetService("RunService").RenderStepped:Connect(function()
+    if not AimAssistEnabled then
+        return
+    end
+
+    local camera = Workspace.CurrentCamera
+    local targetRoot = getClosestAimTarget()
+
+    if camera and targetRoot then
+        local desiredCFrame = CFrame.lookAt(camera.CFrame.Position, targetRoot.Position)
+        camera.CFrame = camera.CFrame:Lerp(desiredCFrame, AIM_SMOOTHNESS)
+    end
+end))
+
+print("MX Hub v1.3 loaded successfully")
