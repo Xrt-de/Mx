@@ -13,11 +13,34 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- SETTINGS
 local ESPEnabled = false
 local AimAssistEnabled = false
-local AIM_SMOOTHNESS = 0.12
+local AIM_SPEED = 50 -- 1 = slow, 100 = very fast
 local AIM_RADIUS = 180
-local PLAYER_COLOR = Color3.fromRGB(80, 150, 255)
 local DUMMY_COLOR = Color3.fromRGB(255, 170, 60)
-local TRACER_COLOR = Color3.fromRGB(80, 150, 255)
+
+local COLOR_OPTIONS = {
+    {name = "Cyan", color = Color3.fromRGB(0, 255, 255)},
+    {name = "Blue", color = Color3.fromRGB(50, 120, 255)},
+    {name = "White", color = Color3.fromRGB(255, 255, 255)},
+    {name = "Grey", color = Color3.fromRGB(145, 145, 155)},
+    {name = "Black", color = Color3.fromRGB(20, 20, 20)},
+    {name = "Red", color = Color3.fromRGB(255, 55, 55)},
+    {name = "Green", color = Color3.fromRGB(55, 220, 95)},
+    {name = "Yellow", color = Color3.fromRGB(255, 230, 40)},
+    {name = "Pink", color = Color3.fromRGB(255, 105, 180)},
+    {name = "Lavender", color = Color3.fromRGB(180, 140, 255)},
+    {name = "Orange", color = Color3.fromRGB(255, 150, 40)}
+}
+
+local tracerColorIndex = 2
+local playerColorIndex = 2
+
+local function getTracerColor()
+    return COLOR_OPTIONS[tracerColorIndex].color
+end
+
+local function getPlayerColor()
+    return COLOR_OPTIONS[playerColorIndex].color
+end
 
 local highlights = {}
 local tracers = {}
@@ -186,7 +209,7 @@ local function updatePlayer(player)
 
     local character = player.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
-        createHighlight(character, PLAYER_COLOR)
+        createHighlight(character, getPlayerColor())
     end
 end
 
@@ -269,7 +292,7 @@ local function createTracer(player)
     beam.FaceCamera = true
     beam.Width0 = 0.08
     beam.Width1 = 0.04
-    beam.Color = ColorSequence.new(TRACER_COLOR)
+    beam.Color = ColorSequence.new(getTracerColor())
     beam.Transparency = NumberSequence.new(0)
     beam.Enabled = true
     beam.Parent = Workspace
@@ -293,6 +316,24 @@ local function updateTracers()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             createTracer(player)
+        end
+    end
+end
+
+local function refreshPlayerOutlineColors()
+    for model, highlight in pairs(highlights) do
+        if model and model.Parent and highlight and highlight.Parent
+            and isPlayerCharacter(model) then
+            highlight.OutlineColor = getPlayerColor()
+        end
+    end
+end
+
+local function refreshTracerColors()
+    local selectedColor = getTracerColor()
+    for _, data in pairs(tracers) do
+        if data.beam and data.beam.Parent then
+            data.beam.Color = ColorSequence.new(selectedColor)
         end
     end
 end
@@ -352,11 +393,44 @@ local function showESPPage()
 
     updateESPButton()
 
+    local tracerColorButton = makeButton(
+        content,
+        "Tracer Color: " .. COLOR_OPTIONS[tracerColorIndex].name,
+        UDim2.new(0, 0, 0, 88),
+        UDim2.new(1, 0, 0, 34)
+    )
+
+    tracerColorButton.MouseButton1Click:Connect(function()
+        tracerColorIndex = (tracerColorIndex % #COLOR_OPTIONS) + 1
+        tracerColorButton.Text = "Tracer Color: " .. COLOR_OPTIONS[tracerColorIndex].name
+        tracerColorButton.TextColor3 = getTracerColor()
+        refreshTracerColors()
+    end)
+    tracerColorButton.TextColor3 = getTracerColor()
+
+    local playerColorButton = makeButton(
+        content,
+        "Player Outline: " .. COLOR_OPTIONS[playerColorIndex].name,
+        UDim2.new(0, 0, 0, 128),
+        UDim2.new(1, 0, 0, 34)
+    )
+
+    playerColorButton.MouseButton1Click:Connect(function()
+        playerColorIndex = (playerColorIndex % #COLOR_OPTIONS) + 1
+        playerColorButton.Text = "Player Outline: " .. COLOR_OPTIONS[playerColorIndex].name
+        playerColorButton.TextColor3 = getPlayerColor()
+        refreshPlayerOutlineColors()
+        if ESPEnabled then
+            scanPlayers()
+        end
+    end)
+    playerColorButton.TextColor3 = getPlayerColor()
+
     local info = Instance.new("TextLabel")
-    info.Position = UDim2.new(0, 0, 0, 88)
-    info.Size = UDim2.new(1, 0, 0, 72)
+    info.Position = UDim2.new(0, 0, 0, 170)
+    info.Size = UDim2.new(1, 0, 0, 58)
     info.BackgroundTransparency = 1
-    info.Text = "Blue: Players + Tracers\\nOrange: NPC Dummies"
+    info.Text = "Click color buttons to cycle colors.\\nOrange: NPC Dummies"
     info.TextColor3 = Color3.fromRGB(175, 175, 190)
     info.Font = Enum.Font.Gotham
     info.TextSize = 13
@@ -366,9 +440,40 @@ local function showESPPage()
 end
 
 -- AIM ASSIST
--- Studio test-place feature: aims toward the closest player's HumanoidRootPart.
--- No selectable body-part targeting; the target point is fixed at the character root.
+-- Studio test-place camera training feature with a selectable body-part target.
 local aimButton
+local targetPartButton
+local TARGET_PARTS = {"Head", "Torso", "Legs"}
+local targetPartIndex = 1
+
+local function getSelectedTargetPosition(character)
+    if not character then
+        return nil
+    end
+
+    local selected = TARGET_PARTS[targetPartIndex]
+
+    if selected == "Head" then
+        local head = character:FindFirstChild("Head")
+        return head and head.Position or nil
+    elseif selected == "Torso" then
+        local torso = character:FindFirstChild("UpperTorso")
+            or character:FindFirstChild("Torso")
+            or character:FindFirstChild("HumanoidRootPart")
+        return torso and torso.Position or nil
+    else
+        -- R15: midpoint of lower legs; R6: midpoint of the two legs.
+        local leftLeg = character:FindFirstChild("LeftLowerLeg")
+            or character:FindFirstChild("Left Leg")
+        local rightLeg = character:FindFirstChild("RightLowerLeg")
+            or character:FindFirstChild("Right Leg")
+        if leftLeg and rightLeg then
+            return (leftLeg.Position + rightLeg.Position) / 2
+        end
+        local root = character:FindFirstChild("HumanoidRootPart")
+        return root and (root.Position - Vector3.new(0, 2, 0)) or nil
+    end
+end
 
 local function getClosestAimTarget()
     local camera = Workspace.CurrentCamera
@@ -377,17 +482,17 @@ local function getClosestAimTarget()
     end
 
     local viewportCenter = camera.ViewportSize / 2
-    local closestRoot = nil
+    local closestPosition = nil
     local closestDistance = AIM_RADIUS
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local character = player.Character
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            local root = character and character:FindFirstChild("HumanoidRootPart")
+            local targetPosition = getSelectedTargetPosition(character)
 
-            if humanoid and humanoid.Health > 0 and root then
-                local screenPoint, onScreen = camera:WorldToViewportPoint(root.Position)
+            if humanoid and humanoid.Health > 0 and targetPosition then
+                local screenPoint, onScreen = camera:WorldToViewportPoint(targetPosition)
 
                 if onScreen and screenPoint.Z > 0 then
                     local screenPosition = Vector2.new(screenPoint.X, screenPoint.Y)
@@ -395,14 +500,20 @@ local function getClosestAimTarget()
 
                     if distance < closestDistance then
                         closestDistance = distance
-                        closestRoot = root
+                        closestPosition = targetPosition
                     end
                 end
             end
         end
     end
 
-    return closestRoot
+    return closestPosition
+end
+
+local function updateTargetPartButton()
+    if targetPartButton then
+        targetPartButton.Text = "TARGET PART: " .. TARGET_PARTS[targetPartIndex] .. "  [CHANGE]"
+    end
 end
 
 local function updateAimButton()
@@ -437,11 +548,118 @@ local function showAimPage()
 
     updateAimButton()
 
+    targetPartButton = makeButton(
+        content,
+        "TARGET PART: Head  [CHANGE]",
+        UDim2.new(0, 0, 0, 88),
+        UDim2.new(1, 0, 0, 34)
+    )
+    targetPartButton.MouseButton1Click:Connect(function()
+        targetPartIndex = (targetPartIndex % #TARGET_PARTS) + 1
+        updateTargetPartButton()
+    end)
+    updateTargetPartButton()
+
+    local speedHeading = Instance.new("TextLabel")
+    speedHeading.Position = UDim2.new(0, 0, 0, 136)
+    speedHeading.Size = UDim2.new(1, 0, 0, 24)
+    speedHeading.BackgroundTransparency = 1
+    speedHeading.Text = "AIM SPEED"
+    speedHeading.TextColor3 = Color3.fromRGB(230, 230, 240)
+    speedHeading.Font = Enum.Font.GothamMedium
+    speedHeading.TextSize = 13
+    speedHeading.TextXAlignment = Enum.TextXAlignment.Left
+    speedHeading.Parent = content
+
+    local speedValueLabel = Instance.new("TextLabel")
+    speedValueLabel.Position = UDim2.new(1, -48, 0, 136)
+    speedValueLabel.Size = UDim2.new(0, 48, 0, 24)
+    speedValueLabel.BackgroundTransparency = 1
+    speedValueLabel.Text = tostring(AIM_SPEED)
+    speedValueLabel.TextColor3 = Color3.fromRGB(110, 150, 255)
+    speedValueLabel.Font = Enum.Font.GothamBold
+    speedValueLabel.TextSize = 13
+    speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    speedValueLabel.Parent = content
+
+    local sliderTrack = Instance.new("Frame")
+    sliderTrack.Name = "AimSpeedTrack"
+    sliderTrack.Position = UDim2.new(0, 0, 0, 168)
+    sliderTrack.Size = UDim2.new(1, 0, 0, 10)
+    sliderTrack.BackgroundColor3 = Color3.fromRGB(48, 48, 64)
+    sliderTrack.BorderSizePixel = 0
+    sliderTrack.Parent = content
+    addCorner(sliderTrack, 5)
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Name = "Fill"
+    sliderFill.Size = UDim2.new((AIM_SPEED - 1) / 99, 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(80, 130, 255)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderTrack
+    addCorner(sliderFill, 5)
+
+    local sliderKnob = Instance.new("Frame")
+    sliderKnob.Name = "Knob"
+    sliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
+    sliderKnob.Size = UDim2.new(0, 18, 0, 18)
+    sliderKnob.Position = UDim2.new((AIM_SPEED - 1) / 99, 0, 0.5, 0)
+    sliderKnob.BackgroundColor3 = Color3.fromRGB(235, 235, 245)
+    sliderKnob.BorderSizePixel = 0
+    sliderKnob.Parent = sliderTrack
+    addCorner(sliderKnob, 9)
+
+    local draggingSlider = false
+
+    local function setSpeedFromX(x)
+        local width = sliderTrack.AbsoluteSize.X
+        if width <= 0 then
+            return
+        end
+
+        local relative = math.clamp(
+            (x - sliderTrack.AbsolutePosition.X) / width,
+            0,
+            1
+        )
+
+        AIM_SPEED = math.clamp(math.floor(1 + relative * 99 + 0.5), 1, 100)
+        local alpha = (AIM_SPEED - 1) / 99
+
+        sliderFill.Size = UDim2.new(alpha, 0, 1, 0)
+        sliderKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
+        speedValueLabel.Text = tostring(AIM_SPEED)
+    end
+
+    sliderTrack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = true
+            setSpeedFromX(input.Position.X)
+        end
+    end)
+
+    table.insert(connections, UIS.InputChanged:Connect(function(input)
+        if draggingSlider and (
+            input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        ) then
+            setSpeedFromX(input.Position.X)
+        end
+    end))
+
+    table.insert(connections, UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = false
+        end
+    end))
+
     local info = Instance.new("TextLabel")
-    info.Position = UDim2.new(0, 0, 0, 88)
-    info.Size = UDim2.new(1, 0, 0, 78)
+    info.Position = UDim2.new(0, 0, 0, 148)
+    info.Size = UDim2.new(1, 0, 0, 72)
     info.BackgroundTransparency = 1
-    info.Text = "Toggle aim assist ON/OFF.\nAutomatically targets the character root; no head, torso, or leg selection."
+    info.Text = "1 = slow smooth tracking\n100 = very fast snap/flick\nTarget point is fixed to character root."
     info.TextColor3 = Color3.fromRGB(175, 175, 190)
     info.Font = Enum.Font.Gotham
     info.TextSize = 13
@@ -600,12 +818,13 @@ table.insert(connections, game:GetService("RunService").RenderStepped:Connect(fu
     end
 
     local camera = Workspace.CurrentCamera
-    local targetRoot = getClosestAimTarget()
+    local targetPosition = getClosestAimTarget()
 
-    if camera and targetRoot then
-        local desiredCFrame = CFrame.lookAt(camera.CFrame.Position, targetRoot.Position)
-        camera.CFrame = camera.CFrame:Lerp(desiredCFrame, AIM_SMOOTHNESS)
+    if camera and targetPosition then
+        local desiredCFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition)
+        local alpha = 1 - math.pow(1 - (AIM_SPEED / 100), 2)
+        camera.CFrame = camera.CFrame:Lerp(desiredCFrame, alpha)
     end
 end))
 
-print("MX Hub v1.3 loaded successfully")
+print("MX Hub v1.6 loaded successfully")
